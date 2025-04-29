@@ -1,0 +1,25 @@
+/* Basic reset */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Arial, sans-serif; background: #f4f4f4; color: #333; height: 100vh; display: flex; flex-direction: column; }
+header { background: #222; color: #fff; padding: 1rem; text-align: center; }
+main { flex: 1; display: flex; overflow: hidden; }
+#transcript { flex: 3; padding: 1rem; background: #fff; border-right: 1px solid #ddd; overflow-y: auto; }
+#messages { display: flex; flex-direction: column; gap: 0.5rem; }
+.message { padding: 0.5rem 1rem; border-radius: 8px; max-width: 80%; margin-bottom: 1rem; }
+.message.system { background: #ececec; align-self: center; font-style: italic; }
+.message.ellie { background: #fdecea; align-self: flex-start; }
+.message.abby { background: #e6f4ea; align-self: flex-end; }
+.message.moderator { background: #fff9e6; align-self: center; }
+.message.judge { background: #f0e0fd; align-self: center; }
+
+/* Message components */
+.message-header { font-weight: bold; margin-bottom: 0.5rem; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 0.3rem; }
+.message-content { line-height: 1.4; }
+
+/* Controls */
+#controls { flex: 1; padding: 1rem; background: #fafafa; display: flex; flex-direction: column; }
+#controls button { padding: 0.75rem; margin-bottom: 1rem; font-size: 1rem; border: none; border-radius: 4px; cursor: pointer; }
+#controls button:disabled { background: #ccc; cursor: not-allowed; }
+#startBtn { background: #4caf50; color: #fff; }
+#nextBtn { background: #2196f3; color: #fff; }
+#roundLabel { margin-top: auto; font-weight: bold; text-align: center; font-size: 1.1rem; }
