@@ -22,4 +22,5 @@ main { flex: 1; display: flex; overflow: hidden; }
 #controls button:disabled { background: #ccc; cursor: not-allowed; }
 #startBtn { background: #4caf50; color: #fff; }
 #nextBtn { background: #2196f3; color: #fff; }
+#autoRunBtn { background: #ff9800; color: #fff; margin-top: 10px; }
 #roundLabel { margin-top: auto; font-weight: bold; text-align: center; font-size: 1.1rem; }

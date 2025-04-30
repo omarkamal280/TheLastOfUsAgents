@@ -173,11 +173,23 @@ def api_next():
     elif step['action'] == 'verdict':
         # Collate transcript
         transcript = "\n".join([f"{m.get('name', m['role'].capitalize())}: {m['content']}" for m in msgs])
+        
+        # Create judge prompt
+        judge_system_prompt = prompts['judge']
+        judge_user_prompt = f'Based on the full debate transcript below, deliver your definitive verdict on whether Ellie or Abby had greater moral justification for their actions. Be decisive and clear in your judgment.\n\nTranscript:\n{transcript}'
+        
+        # Print the exact prompt the judge gets
+        print("\n\n===== JUDGE PROMPT =====\n")
+        print("SYSTEM PROMPT:\n", judge_system_prompt)
+        print("\nUSER PROMPT:\n", judge_user_prompt)
+        print("\n=======================\n\n")
+        
+        # Call judge with GPT-4o (not mini)
         verdict = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4o",  # Using full GPT-4o instead of mini
             messages=[
-                {"role": "system", "content": prompts['judge']},
-                {"role": "user", "content": f'Based on the full debate transcript below, deliver your definitive verdict on whether Ellie or Abby had greater moral justification for their actions. Be decisive and clear in your judgment.\n\nTranscript:\n{transcript}'}
+                {"role": "system", "content": judge_system_prompt},
+                {"role": "user", "content": judge_user_prompt}
             ]
         ).choices[0].message.content
         msgs.append({'role': 'judge', 'content': verdict, 'name': get_agent_name('judge')})
@@ -190,6 +202,58 @@ def api_next():
         'round': round_index,
         'step': step_index,
         'complete': round_index >= len(round_definitions) - 1 and step_index >= len(round_steps) - 1
+    })
+
+# Run full debate automatically
+@app.route('/api/auto-run', methods=['POST'])
+def api_auto_run():
+    # Reset state
+    state['round_index'] = 0
+    state['messages'] = []
+    state['step'] = 0
+    
+    # Process all rounds
+    for round_idx in range(len(round_definitions)):
+        # Set current round
+        state['round_index'] = round_idx
+        state['round_steps'] = round_definitions[round_idx]
+        
+        # Process all steps in the round
+        for step_idx in range(len(state['round_steps'])):
+            step = state['round_steps'][step_idx]
+            
+            # Process the step
+            if step['action'] == 'call_agent':
+                include_history = step.get('include_history', False)
+                result = call_agent(step['agent'], step['prompt'], include_history)
+                state['messages'].append({'role': step['agent'], 'content': result, 'name': get_agent_name(step['agent'])})
+            elif step['action'] == 'verdict':
+                # Collate transcript
+                transcript = "\n".join([f"{m.get('name', m['role'].capitalize())}: {m['content']}" for m in state['messages']])
+                
+                # Create judge prompt
+                judge_system_prompt = prompts['judge']
+                judge_user_prompt = f'Based on the full debate transcript below, deliver your definitive verdict on whether Ellie or Abby had greater moral justification for their actions. Be decisive and clear in your judgment.\n\nTranscript:\n{transcript}'
+                
+                # Print the exact prompt the judge gets
+                print("\n\n===== JUDGE PROMPT =====\n")
+                print("SYSTEM PROMPT:\n", judge_system_prompt)
+                print("\nUSER PROMPT:\n", judge_user_prompt)
+                print("\n=======================\n\n")
+                
+                # Call judge with GPT-4o (not mini)
+                verdict = client.chat.completions.create(
+                    model="gpt-4o",  # Using full GPT-4o instead of mini
+                    messages=[
+                        {"role": "system", "content": judge_system_prompt},
+                        {"role": "user", "content": judge_user_prompt}
+                    ]
+                ).choices[0].message.content
+                state['messages'].append({'role': 'judge', 'content': verdict, 'name': get_agent_name('judge')})
+    
+    return jsonify({
+        'messages': state['messages'],
+        'complete': True
     })
 
 if __name__ == '__main__':

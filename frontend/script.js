@@ -1,6 +1,7 @@
 const messagesDiv = document.getElementById('messages');
 const startBtn = document.getElementById('startBtn');
 const nextBtn = document.getElementById('nextBtn');
+const autoRunBtn = document.getElementById('autoRunBtn');
 const roundLabel = document.getElementById('roundLabel');
 
 let roundIndex = 0;
@@ -68,5 +69,27 @@ function renderMessages(msgs) {
   messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
 
+async function autoRunDebate() {
+  // Disable all buttons during auto run
+  startBtn.disabled = true;
+  nextBtn.disabled = true;
+  autoRunBtn.disabled = true;
+  roundLabel.textContent = 'Auto-running debate...';
+  
+  try {
+    const res = await fetch('/api/auto-run', { method: 'POST' });
+    const data = await res.json();
+    
+    if (data.complete) {
+      roundLabel.textContent = 'Debate Complete';
+      renderMessages(data.messages);
+    }
+  } catch (error) {
+    console.error('Error auto-running debate:', error);
+    roundLabel.textContent = 'Error: ' + error.message;
+  }
+}
+
 startBtn.addEventListener('click', startDebate);
 nextBtn.addEventListener('click', nextMessage);
+autoRunBtn.addEventListener('click', autoRunDebate);
