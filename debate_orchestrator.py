@@ -45,13 +45,30 @@ def index():
 def static_proxy(path):
     return app.send_static_file(path)
 
-# Utility to call OpenAI
-def call_agent(agent, user_msg):
+# Utility to call OpenAI with context from previous messages
+def call_agent(agent, user_msg, include_history=False):
     system_prompt = prompts[agent]
-    msgs = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_msg}
-    ]
+    msgs = [{"role": "system", "content": system_prompt}]
+    
+    # Include relevant history if requested
+    if include_history and len(state['messages']) > 0:
+        # Create a context summary of previous arguments
+        context = "Previous arguments:\n"
+        for msg in state['messages']:
+            if msg['role'] in ['ellie', 'abby']:
+                speaker = msg.get('name', msg['role'].capitalize())
+                # Truncate long messages for context
+                content = msg['content']
+                if len(content) > 200:
+                    content = content[:197] + "..."
+                context += f"{speaker}: {content}\n\n"
+        
+        # Add context as a system message
+        msgs.append({"role": "system", "content": context})
+    
+    # Add the current prompt
+    msgs.append({"role": "user", "content": user_msg})
+    
     res = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=msgs
@@ -71,37 +88,41 @@ def get_agent_name(role):
 # Define debate flow
 round_definitions = {
     0: [
-        {'action': 'call_agent', 'agent': 'moderator', 'prompt': 'The debate will now begin. Please introduce the debate and call for Opening Statements.'},
-        {'action': 'call_agent', 'agent': 'ellie', 'prompt': 'Opening Statement'},
-        {'action': 'call_agent', 'agent': 'moderator', 'prompt': 'Debater B (Abby\'s Attorney), please present your opening statement.'},
-        {'action': 'call_agent', 'agent': 'abby', 'prompt': 'Opening Statement'}
+        {'action': 'call_agent', 'agent': 'moderator', 'prompt': 'As the Court Moderator, introduce the debate with gravitas and call on Ellie\'s Attorney to present their opening statement. Be brief and neutral.'},
+        {'action': 'call_agent', 'agent': 'ellie', 'prompt': 'Opening Statement', 'include_history': False},
+        {'action': 'call_agent', 'agent': 'moderator', 'prompt': 'As the Court Moderator, thank Ellie\'s Attorney and now call on Abby\'s Attorney to present their opening statement. Remain neutral.'},
+        {'action': 'call_agent', 'agent': 'abby', 'prompt': 'Opening Statement', 'include_history': False}
     ],
     1: [
-        {'action': 'call_agent', 'agent': 'moderator', 'prompt': 'Evidence Presentation round. Please call Debater A (Ellie\'s Attorney) to present their evidence.'},
-        {'action': 'call_agent', 'agent': 'ellie', 'prompt': 'Evidence Presentation'},
-        {'action': 'call_agent', 'agent': 'moderator', 'prompt': 'Please call Debater B (Abby\'s Attorney) to present their evidence.'},
-        {'action': 'call_agent', 'agent': 'abby', 'prompt': 'Evidence Presentation'}
+        {'action': 'call_agent', 'agent': 'moderator', 'prompt': 'As the Court Moderator, announce the Evidence Presentation round and call on Ellie\'s Attorney to present their evidence with specific details from Ellie\'s testimony.'},
+        {'action': 'call_agent', 'agent': 'ellie', 'prompt': 'Evidence Presentation', 'include_history': True},
+        {'action': 'call_agent', 'agent': 'moderator', 'prompt': 'As the Court Moderator, now call on Abby\'s Attorney to present their evidence with specific details from Abby\'s testimony.'},
+        {'action': 'call_agent', 'agent': 'abby', 'prompt': 'Evidence Presentation', 'include_history': True}
     ],
     2: [
-        {'action': 'call_agent', 'agent': 'moderator', 'prompt': 'Rebuttal round. Please call Debater A to address the opponent\'s points.'},
-        {'action': 'call_agent', 'agent': 'ellie', 'prompt': 'Rebuttal'},
-        {'action': 'call_agent', 'agent': 'moderator', 'prompt': 'Please call Debater B to provide their rebuttal.'},
-        {'action': 'call_agent', 'agent': 'abby', 'prompt': 'Rebuttal'}
+        {'action': 'call_agent', 'agent': 'moderator', 'prompt': 'As the Court Moderator, announce the Rebuttal round and call on Ellie\'s Attorney to directly challenge the opposing arguments about Abby\'s justification.'},
+        {'action': 'call_agent', 'agent': 'ellie', 'prompt': 'Rebuttal - directly attack Abby\'s arguments and justifications', 'include_history': True},
+        {'action': 'call_agent', 'agent': 'moderator', 'prompt': 'As the Court Moderator, now call on Abby\'s Attorney to counter the arguments made by Ellie\'s side.'},
+        {'action': 'call_agent', 'agent': 'abby', 'prompt': 'Rebuttal - aggressively counter Ellie\'s arguments and justifications', 'include_history': True}
     ],
     3: [
-        {'action': 'call_agent', 'agent': 'moderator', 'prompt': 'Cross-Examination: Ask Debater A how they respond to the argument that their pursuit inflicted harm on innocents.'},
-        {'action': 'call_agent', 'agent': 'ellie', 'prompt': 'Cross-Examination: How do you respond to the argument that your pursuit inflicted harm on innocents?'},
-        {'action': 'call_agent', 'agent': 'moderator', 'prompt': 'Ask Debater B how they respond to the harm they caused to friends of Ellie during their initial revenge pursuit.'},
-        {'action': 'call_agent', 'agent': 'abby', 'prompt': 'Cross-Examination: How do you respond to the harm you caused to friends of Ellie during your initial revenge pursuit?'}
+        {'action': 'call_agent', 'agent': 'moderator', 'prompt': 'As the Court Moderator, announce the Cross-Examination round. Ask Ellie\'s Attorney the following question: Your client killed many people during her pursuit of Abby, including some who had minimal involvement in Joel\'s death. How can you justify this level of collateral damage in the name of revenge?'},
+        {'action': 'call_agent', 'agent': 'ellie', 'prompt': 'Cross-Examination: Your client killed many people during her pursuit of Abby, including some who had minimal involvement in Joel\'s death. How can you justify this level of collateral damage in the name of revenge?', 'include_history': True},
+        {'action': 'call_agent', 'agent': 'moderator', 'prompt': 'As the Court Moderator, ask Ellie\'s Attorney this follow-up question: If your client truly sought justice rather than revenge, why didn\'t she stop her pursuit after learning about Abby\'s motivation regarding her father?'},
+        {'action': 'call_agent', 'agent': 'ellie', 'prompt': 'Follow-up: If your client truly sought justice rather than revenge, why didn\'t she stop her pursuit after learning about Abby\'s motivation regarding her father?', 'include_history': True},
+        {'action': 'call_agent', 'agent': 'moderator', 'prompt': 'As the Court Moderator, now ask Abby\'s Attorney this question: Your client didn\'t just kill Joel - she tortured him and made Ellie watch. How can you claim this was justice rather than cruel revenge designed to inflict maximum emotional damage?'},
+        {'action': 'call_agent', 'agent': 'abby', 'prompt': 'Cross-Examination: Your client didn\'t just kill Joel - she tortured him and made Ellie watch. How can you claim this was justice rather than cruel revenge designed to inflict maximum emotional damage?', 'include_history': True},
+        {'action': 'call_agent', 'agent': 'moderator', 'prompt': 'As the Court Moderator, ask Abby\'s Attorney this follow-up question: If your client\'s motivation was truly justice for her father and humanity, why did she spare Ellie but kill Joel, when both were equally responsible for preventing the cure?'},
+        {'action': 'call_agent', 'agent': 'abby', 'prompt': 'Follow-up: If your client\'s motivation was truly justice for her father and humanity, why did she spare Ellie but kill Joel, when both were equally responsible for preventing the cure?', 'include_history': True}
     ],
     4: [
-        {'action': 'call_agent', 'agent': 'moderator', 'prompt': 'Closing Statements: Ask Debater A to deliver their closing statement.'},
-        {'action': 'call_agent', 'agent': 'ellie', 'prompt': 'Closing Statement'},
-        {'action': 'call_agent', 'agent': 'moderator', 'prompt': 'Ask Debater B to deliver their closing statement.'},
-        {'action': 'call_agent', 'agent': 'abby', 'prompt': 'Closing Statement'}
+        {'action': 'call_agent', 'agent': 'moderator', 'prompt': 'As the Court Moderator, announce the Closing Statements round and call on Ellie\'s Attorney to deliver their final appeal about why Ellie\'s actions were justified.'},
+        {'action': 'call_agent', 'agent': 'ellie', 'prompt': 'Closing Statement - Make your final, passionate appeal about why Ellie\'s actions were morally justified and Abby\'s were not.', 'include_history': True},
+        {'action': 'call_agent', 'agent': 'moderator', 'prompt': 'As the Court Moderator, now call on Abby\'s Attorney to deliver their final appeal about why Abby\'s actions were justified.'},
+        {'action': 'call_agent', 'agent': 'abby', 'prompt': 'Closing Statement - Make your final, principled appeal about why Abby\'s actions were morally justified and Ellie\'s pursuit was excessive.', 'include_history': True}
     ],
     5: [
-        {'action': 'call_agent', 'agent': 'moderator', 'prompt': 'Now call the Judge to deliver the final verdict.'},
+        {'action': 'call_agent', 'agent': 'moderator', 'prompt': 'As the Court Moderator, thank both attorneys for their arguments and now call on the Judge to deliver a definitive verdict on which party had greater moral justification for their actions.'},
         {'action': 'verdict'}
     ]
 }
@@ -146,7 +167,8 @@ def api_next():
     
     # Process the step
     if step['action'] == 'call_agent':
-        result = call_agent(step['agent'], step['prompt'])
+        include_history = step.get('include_history', False)
+        result = call_agent(step['agent'], step['prompt'], include_history)
         msgs.append({'role': step['agent'], 'content': result, 'name': get_agent_name(step['agent'])})
     elif step['action'] == 'verdict':
         # Collate transcript
@@ -155,7 +177,7 @@ def api_next():
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": prompts['judge']},
-                {"role": "user", "content": f'Please deliver your verdict based on the transcript:\n{transcript}'}
+                {"role": "user", "content": f'Based on the full debate transcript below, deliver your definitive verdict on whether Ellie or Abby had greater moral justification for their actions. Be decisive and clear in your judgment.\n\nTranscript:\n{transcript}'}
             ]
         ).choices[0].message.content
         msgs.append({'role': 'judge', 'content': verdict, 'name': get_agent_name('judge')})
