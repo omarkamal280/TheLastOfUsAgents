@@ -68,7 +68,8 @@ After all rounds are complete, the judge delivers a verdict on which character h
 
 The debate is based on first-person testimonies from the two main characters:
 
-- **Ellie's Testimony**: 
+- **Ellie's Testimony**:
+``` 
 I was living a quiet life in Jackson with Joel — my protector, my father figure, my entire world. After everything we'd been through — crossing the country, surviving infected and worse — we found something close to peace. But that peace was shattered when a woman named Abby brutally murdered Joel in front of me.
 
 I couldn't let that go. Joel saved my life countless times. He gave up everything for me. I couldn't sit still while the person who killed him walked free. This wasn't just revenge — it was justice.
@@ -80,8 +81,10 @@ I lost things too. Jesse. Dina's love. Myself. And in the end, I had the chance 
 I want the court to understand: I'm not a monster. I'm a broken person trying to make sense of a world that keeps taking everything from me.
 
 – Ellie
+```
 
 - **Abby's Testimony**: 
+``` 
 Years ago, my father — a Firefly doctor — was murdered. He was about to perform surgery on a girl, Ellie, who might've been humanity's last hope for a cure. Joel killed him to save her. One man's decision stole my father and any chance at ending the infection.
 
 I trained for years after that. Not out of hatred, but out of conviction. Joel wasn't a hero. He was a murderer who sentenced countless people to death by saving one person.
@@ -93,6 +96,7 @@ Later, Ellie hunted me down. She killed my friends — people I loved, people wh
 I'm not proud of all I've done. But I did what I believed was right — avenging my father, honoring the hope he died for. I never wanted endless violence. I just wanted justice.
 
 – Abby
+```
 
 ### Agent Prompts
 
