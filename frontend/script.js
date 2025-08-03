@@ -69,25 +69,61 @@ function renderMessages(msgs) {
   messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
 
-async function autoRunDebate() {
+function autoRunDebate() {
   // Disable all buttons during auto run
   startBtn.disabled = true;
   nextBtn.disabled = true;
   autoRunBtn.disabled = true;
   roundLabel.textContent = 'Auto-running debate...';
+  messagesDiv.innerHTML = ''; // Clear any existing messages
   
-  try {
-    const res = await fetch('/api/auto-run', { method: 'POST' });
-    const data = await res.json();
-    
-    if (data.complete) {
-      roundLabel.textContent = 'Debate Complete';
-      renderMessages(data.messages);
-    }
-  } catch (error) {
-    console.error('Error auto-running debate:', error);
-    roundLabel.textContent = 'Error: ' + error.message;
-  }
+  // Flag to track if debate is complete
+  let debateComplete = false;
+  
+  // First, initiate the debate
+  fetch('/api/auto-run-start', { method: 'POST' })
+    .then(response => response.json())
+    .then(data => {
+      if (data.status === 'debate_started') {
+        // Set up polling for debate progress
+        const pollInterval = setInterval(() => {
+          if (debateComplete) {
+            clearInterval(pollInterval);
+            return;
+          }
+          
+          fetch('/api/debate-progress')
+            .then(response => response.json())
+            .then(data => {
+              renderMessages(data.messages);
+              
+              // Check if debate is complete
+              if (data.complete) {
+                debateComplete = true;
+                roundLabel.textContent = 'Debate Complete';
+                clearInterval(pollInterval);
+              } else {
+                // Update round label based on message count/progression
+                const msgCount = data.messages.length;
+                if (msgCount <= 2) roundLabel.textContent = rounds[0];
+                else if (msgCount <= 4) roundLabel.textContent = rounds[1]; 
+                else if (msgCount <= 8) roundLabel.textContent = rounds[2];
+                else if (msgCount <= 12) roundLabel.textContent = rounds[3];
+                else if (msgCount <= 14) roundLabel.textContent = rounds[4];
+                else roundLabel.textContent = rounds[5];
+              }
+            })
+            .catch(error => {
+              console.error('Error polling debate progress:', error);
+            });
+        }, 1000); // Poll every second
+      }
+    })
+    .catch(error => {
+      console.error('Failed to initiate debate:', error);
+      roundLabel.textContent = 'Error: Failed to start debate';
+      autoRunBtn.disabled = false;
+    });
 }
 
 startBtn.addEventListener('click', startDebate);

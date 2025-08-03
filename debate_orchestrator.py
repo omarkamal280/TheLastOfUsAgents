@@ -1,4 +1,7 @@
 import os
+import json
+import time
+import threading
 from flask import Flask, send_from_directory, request, jsonify
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -204,13 +207,14 @@ def api_next():
         'complete': round_index >= len(round_definitions) - 1 and step_index >= len(round_steps) - 1
     })
 
-# Run full debate automatically
-@app.route('/api/auto-run', methods=['POST'])
-def api_auto_run():
-    # Reset state
-    state['round_index'] = 0
-    state['messages'] = []
-    state['step'] = 0
+# Global debate state
+debate_in_progress = False
+debate_complete = False
+debate_thread = None
+
+# Function to run debate in background thread
+def run_debate_in_background():
+    global debate_in_progress, debate_complete
     
     # Process all rounds
     for round_idx in range(len(round_definitions)):
@@ -227,6 +231,8 @@ def api_auto_run():
                 include_history = step.get('include_history', False)
                 result = call_agent(step['agent'], step['prompt'], include_history)
                 state['messages'].append({'role': step['agent'], 'content': result, 'name': get_agent_name(step['agent'])})
+                time.sleep(0.2)  # Small delay for frontend to catch up
+                
             elif step['action'] == 'verdict':
                 # Collate transcript
                 transcript = "\n".join([f"{m.get('name', m['role'].capitalize())}: {m['content']}" for m in state['messages']])
@@ -251,10 +257,45 @@ def api_auto_run():
                 ).choices[0].message.content
                 state['messages'].append({'role': 'judge', 'content': verdict, 'name': get_agent_name('judge')})
     
+    # Mark debate as complete
+    debate_complete = True
+    debate_in_progress = False
+
+# Start a new debate
+@app.route('/api/auto-run-start', methods=['POST'])
+def start_auto_run():
+    global debate_in_progress, debate_complete, debate_thread
+    
+    # Only start a new debate if one isn't already in progress
+    if not debate_in_progress:
+        # Reset state
+        state['round_index'] = 0
+        state['messages'] = []
+        state['step'] = 0
+        debate_complete = False
+        debate_in_progress = True
+        
+        # Start debate in a background thread
+        debate_thread = threading.Thread(target=run_debate_in_background)
+        debate_thread.daemon = True  # Allow app to exit even if thread is running
+        debate_thread.start()
+        
+        return jsonify({'status': 'debate_started'})
+    else:
+        return jsonify({'status': 'debate_already_in_progress'})
+
+# Get current debate progress
+@app.route('/api/debate-progress', methods=['GET'])
+def get_debate_progress():
     return jsonify({
         'messages': state['messages'],
-        'complete': True
+        'complete': debate_complete
     })
+
+# Legacy endpoint for backward compatibility
+@app.route('/api/auto-run', methods=['POST'])
+def legacy_auto_run():
+    return start_auto_run()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000, debug=True)
